@@ -5,8 +5,8 @@
 class Switcher < Formula
   desc "Menu bar switch for Claude Code inference routing (Airia gateway or direct)"
   homepage "https://github.com/davehortonairiacom/Switcher"
-  url "https://github.com/davehortonairiacom/Switcher/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "7db51fec081a9efdea028e2d6ed2cdc4890eaefd36f01469d0fda5aa011178f3"
+  url "https://github.com/davehortonairiacom/Switcher/archive/refs/tags/v0.1.1.tar.gz"
+  sha256 "fa26aa6805c1965694db6bde6887da183cfbcd4e0e6512aef2efea67d5fe42b6"
   license "MIT"
   head "https://github.com/davehortonairiacom/Switcher.git", branch: "main"
 
