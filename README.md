@@ -121,6 +121,28 @@ the write our own watcher sees produces no further action. A circuit breaker
 (5 corrections/minute) is a backstop for the adversarial case — an agent actively
 rewriting the file — and trips into notify-only rather than fighting.
 
+## How it interacts with the airiad agent
+
+Switcher works **with** an enforcing agent by pausing it, not by out-writing it.
+
+| You choose | What happens to `airiad` |
+|---|---|
+| Direct | Paused (`launchctl bootout`) — an enforce policy would otherwise re-apply the gateway on the next check-in |
+| A gateway nothing is fighting you over | Left running, so discovery telemetry keeps flowing |
+| A gateway the tenant policy doesn't enforce | Paused as soon as the policy overwrites your choice once |
+
+That last row matters if you keep several gateways. If the tenant policy enforces
+gateway A and you pick gateway B, the agent will overwrite your choice on its
+next check-in. Switcher notices, and rather than entering a write war it stops
+the daemon doing the overwriting, then re-applies your choice. Your gateway wins.
+
+`launchctl bootout` does **not** survive a reboot: the agent returns at login and
+re-enforces. Switcher re-asserts your choice at login, on wake, and whenever
+`settings.json` changes, which is the whole reason it exists.
+
+To let the policy win, untick **Enforce**. Switcher then observes without
+correcting and leaves the agent alone.
+
 ## Distributing it
 
 Builds are **universal** (x86_64 + arm64), so they run on Intel Macs too. The

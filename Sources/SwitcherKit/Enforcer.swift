@@ -162,8 +162,13 @@ public final class Enforcer: @unchecked Sendable {
                 result = .inSync
             } else {
                 let config = profiles.config(for: profile)
+                // If our choice has already been overwritten once, something is
+                // enforcing a different URL. Writing again would just lose the
+                // same race, so pause the agent doing the overwriting instead.
+                let contested = isContested()
                 result = correct(to: target) {
-                    try self.controller.switchToGateway(using: config)
+                    try self.controller.switchToGateway(using: config,
+                                                        keepAgentPaused: contested)
                 }
             }
         }
@@ -183,6 +188,15 @@ public final class Enforcer: @unchecked Sendable {
         } catch {
             return .failed(error.localizedDescription)
         }
+    }
+
+    /// True once we've had to correct more than once inside the window, which
+    /// means something is actively rewriting settings.json underneath us.
+    private func isContested() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        let cutoff = Date().addingTimeInterval(-window)
+        recentCorrections.removeAll { $0 < cutoff }
+        return !recentCorrections.isEmpty
     }
 
     // MARK: - Circuit breaker

@@ -72,8 +72,12 @@ public struct GatewayController: Sendable {
     /// Resolves gateway values from, in order: an explicit override, the stash,
     /// then the agent itself (kickstart and wait for the enforce policy to write).
     @discardableResult
+    /// - Parameter keepAgentPaused: pause the agent instead of resuming it.
+    ///   Needed when routing to a gateway the tenant policy doesn't enforce:
+    ///   a running agent would simply overwrite the choice on its next check-in.
     public func switchToGateway(using override: GatewayConfig? = nil,
-                                waitingForAgent timeout: TimeInterval = 25) throws -> SwitchOutcome {
+                                waitingForAgent timeout: TimeInterval = 25,
+                                keepAgentPaused: Bool = false) throws -> SwitchOutcome {
         var notes: [String] = []
 
         // An explicit target always wins, and must be checked before the
@@ -83,7 +87,7 @@ public struct GatewayController: Sendable {
             try settings.applyGateway(override)
             try? stash.write(override)
             notes.append("Applied \(override.baseURL).")
-            resumeAgent(&notes)
+            if keepAgentPaused { pauseAgent(&notes) } else { resumeAgent(&notes) }
             return SwitchOutcome(mode: settings.currentMode(), agent: agent.status(), notes: notes)
         }
 
@@ -124,6 +128,13 @@ public struct GatewayController: Sendable {
             }
         }
         throw SwitcherError.agentDidNotApplyPolicy(seconds: Int(timeout))
+    }
+
+    private func pauseAgent(_ notes: inout [String]) {
+        guard manageAgent, agent.status() == .running else { return }
+        notes.append(agent.pause()
+            ? "Paused the airiad agent so its enforce policy can't overwrite this."
+            : "Could not pause the airiad agent; it may overwrite this shortly.")
     }
 
     private func resumeAgent(_ notes: inout [String]) {

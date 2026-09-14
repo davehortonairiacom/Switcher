@@ -520,4 +520,46 @@ T.suite("selecting a deleted gateway fails instead of doing something surprising
     }
 }
 
+T.suite("a contested gateway is won by pausing the agent, not by out-writing it") {
+    try withTempClaudeDir { paths in
+        try paths.seed(realShape)
+        let fake = FakeLaunchctl()
+        let controller = GatewayController(paths: paths, agent: try fakeAgent(in: paths, fake))
+        let profiles = ProfileStore(paths: paths, keyStore: InMemoryKeyStore())
+        let enforcer = Enforcer(controller: controller, profiles: profiles, defaults: freshDefaults())
+
+        let mine = GatewayProfile(name: "Mine", baseURL: "https://mine.example/anthropic")
+        try profiles.save(mine, key: "agk-MINE")
+        enforcer.select(.gateway(profileID: mine.id))
+
+        // The tenant policy can only overwrite settings while its agent runs.
+        for _ in 0..<8 {
+            if fake.running { try paths.seed(realShape) }
+            _ = enforcer.evaluate()
+        }
+
+        T.equal(SettingsStore(paths: paths).currentMode(), .gateway(url: mine.baseURL),
+                "the chosen gateway must win, not the enforced one")
+        T.equal(fake.running, false, "the agent gets paused so it stops overwriting")
+        T.isNil(enforcer.snapshot().trippedReason,
+                "pausing resolves it, so the breaker should never trip")
+    }
+}
+
+T.suite("an uncontested gateway leaves the agent running") {
+    try withTempClaudeDir { paths in
+        try paths.seed(#"{ "effortLevel": "high" }"#)   // start direct, nothing fighting
+        let fake = FakeLaunchctl()
+        let controller = GatewayController(paths: paths, agent: try fakeAgent(in: paths, fake))
+        let profiles = ProfileStore(paths: paths, keyStore: InMemoryKeyStore())
+        let enforcer = Enforcer(controller: controller, profiles: profiles, defaults: freshDefaults())
+
+        let tenant = GatewayProfile(name: "Tenant", baseURL: "https://tenant.example/anthropic")
+        try profiles.save(tenant, key: "agk-T")
+        enforcer.select(.gateway(profileID: tenant.id))
+
+        T.equal(fake.running, true, "no conflict means no reason to pause discovery")
+    }
+}
+
 T.report()
