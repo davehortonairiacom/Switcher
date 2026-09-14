@@ -34,6 +34,7 @@ marker, and re-asserts your chosen mode whenever something changes it.
 Requires only the Xcode Command Line Tools — no full Xcode.
 
 ```sh
+brew trust davehortonairiacom/tap   # Homebrew refuses third-party taps without this
 brew tap davehortonairiacom/tap
 brew install switcher
 ln -sfn "$(brew --prefix)/opt/switcher/Switcher.app" ~/Applications/Switcher.app
